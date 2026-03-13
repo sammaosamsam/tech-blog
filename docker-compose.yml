@@ -1,20 +1,20 @@
 # ============================================================
-# Tech Blog - Docker Compose 生产配置
-# 服务：tech-blog (Node.js App) + nginx (反向代理)
-# 用法：docker compose up -d --build
+# Tech Blog - Docker Compose 远程镜像部署配置
+#
+# 镜像由 GitHub Actions 自动构建并推送到 ghcr.io
+# 部署前需登录：docker login ghcr.io -u <GitHub用户名> -p <PAT>
+#
+# 启动：docker compose up -d
+# 更新：docker compose pull && docker compose up -d
 # ============================================================
 
 services:
 
   # ----------------------------------------------------------
-  # 应用服务：Node.js (React 前端 + Express 后端)
+  # 应用服务：从 GitHub Container Registry 拉取镜像
   # ----------------------------------------------------------
   tech-blog:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        - NODE_ENV=production
+    image: ghcr.io/sammaosamsam/tech-blog/tech-blog:latest
     container_name: tech-blog-app
     restart: unless-stopped
 
@@ -24,13 +24,10 @@ services:
       - DATA_DIR=/app/backend/data
 
     volumes:
-      # 持久化博客数据（文章、配置等）
       - blog-data:/app/backend/data
-      # 持久化上传文件
       - blog-uploads:/app/backend/uploads
 
     expose:
-      # 仅对内部网络暴露端口，不直接对外
       - "5000"
 
     networks:
@@ -56,7 +53,7 @@ services:
         max-file: "3"
 
   # ----------------------------------------------------------
-  # Nginx 反向代理：对外提供 HTTP/HTTPS 入口
+  # Nginx 反向代理
   # ----------------------------------------------------------
   nginx:
     image: nginx:1.25-alpine
@@ -93,7 +90,7 @@ services:
         max-file: "3"
 
 # ============================================================
-# 持久化卷（使用 named volume，Docker 自动管理路径）
+# 持久化卷
 # ============================================================
 volumes:
   blog-data:
