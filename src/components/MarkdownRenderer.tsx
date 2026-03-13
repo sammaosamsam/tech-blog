@@ -1,7 +1,7 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import rehypeHighlight from 'rehype-highlight';
 import rehypeRaw from 'rehype-raw';
+import hljs from 'highlight.js';
 import 'highlight.js/styles/github-dark.css';
 
 interface MarkdownRendererProps {
@@ -13,7 +13,7 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
     <div className="prose prose-slate dark:prose-invert max-w-none">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
-        rehypePlugins={[rehypeRaw, rehypeHighlight]}
+        rehypePlugins={[rehypeRaw]}
         components={{
           h1: ({ children }) => (
             <h1 className="text-4xl font-bold mt-8 mb-4">{children}</h1>
@@ -27,23 +27,34 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
           p: ({ children }) => (
             <p className="mb-4 leading-relaxed">{children}</p>
           ),
-          code: ({ className, children, node, ...props }) => {
-            const isInline = !node?.position || (node.position.start.line === node.position.end.line);
-            if (isInline && !className) {
+          code: ({ className, children, ...props }) => {
+            const isBlock = Boolean(className);
+            if (isBlock) {
+              const lang = (className || '').replace('language-', '');
+              const code = String(children).replace(/\n$/, '');
+              let highlighted = '';
+              try {
+                highlighted = lang && hljs.getLanguage(lang)
+                  ? hljs.highlight(code, { language: lang }).value
+                  : hljs.highlightAuto(code).value;
+              } catch {
+                highlighted = code;
+              }
               return (
-                <code className="bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded text-sm font-mono" {...props}>
-                  {children}
-                </code>
+                <code
+                  className={`hljs language-${lang || 'plaintext'}`}
+                  dangerouslySetInnerHTML={{ __html: highlighted }}
+                />
               );
             }
             return (
-              <code className={className} {...props}>
+              <code className="bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded text-sm font-mono" {...props}>
                 {children}
               </code>
             );
           },
           pre: ({ children }) => (
-            <pre className="bg-gray-100 dark:bg-gray-800 p-4 rounded-lg overflow-x-auto mb-4">
+            <pre className="bg-gray-900 p-4 rounded-lg overflow-x-auto mb-4 text-sm">
               {children}
             </pre>
           ),
@@ -75,6 +86,17 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
               onError={(e) => {
                 const target = e.currentTarget;
                 target.style.display = 'none';
+              }}
+            />
+          ),
+        }}
+      >
+        {content}
+      </ReactMarkdown>
+    </div>
+  );
+}
+
               }}
             />
           ),

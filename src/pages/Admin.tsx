@@ -655,26 +655,22 @@ export default function Admin() {
     navigate('/');
   };
 
-  const handleSave = async (article: Article) => {
-    try {
-      const token = localStorage.getItem('token');
-      const isEdit = Boolean(article._id);
-      const url = isEdit ? `/api/articles/${article._id}` : '/api/articles';
-      const method = isEdit ? 'PUT' : 'POST';
+  const handleSave = async (article: Article): Promise<void> => {
+    const token = localStorage.getItem('token');
+    const isEdit = Boolean(article._id);
+    const url = isEdit ? `/api/articles/${article._id}` : '/api/articles';
+    const method = isEdit ? 'PUT' : 'POST';
 
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(article)
-      });
-      if (!res.ok) throw new Error();
-      showToast(isEdit ? '文章更新成功' : '文章创建成功');
-      setActiveTab('articles');
-      setEditingArticle(undefined);
-      fetchArticles();
-    } catch {
-      showToast('保存失败，请重试', 'error');
-    }
+    const res = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(article)
+    });
+    if (!res.ok) throw new Error('保存失败');
+    showToast(isEdit ? '文章更新成功' : '文章创建成功');
+    setActiveTab('articles');
+    setEditingArticle(undefined);
+    fetchArticles();
   };
 
   const handleEdit = (article: Article) => {

@@ -23,7 +23,7 @@ interface Category {
 
 interface ArticleEditorProps {
   article?: Article;
-  onSave: (article: Article) => void;
+  onSave: (article: Article) => Promise<void>;
   onCancel: () => void;
 }
 
@@ -253,6 +253,7 @@ export default function ArticleEditor({ article, onSave, onCancel }: ArticleEdit
     e.preventDefault();
     if (submitting) return;
     setSubmitting(true);
+    setUploadError('');
     try {
       await onSave({
         _id: article?._id || '',
@@ -267,6 +268,8 @@ export default function ArticleEditor({ article, onSave, onCancel }: ArticleEdit
         coverImage,
         visible: article?.visible !== false
       });
+    } catch {
+      setUploadError('保存失败，请重试');
     } finally {
       setSubmitting(false);
     }
