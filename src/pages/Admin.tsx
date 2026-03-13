@@ -871,12 +871,23 @@ export default function Admin() {
             </div>
           )}
 
-          {(activeTab === 'new' || activeTab === 'edit') && (
+          {activeTab === 'new' && (
             <div>
-              <h2 className="mb-4 text-xl font-semibold">
-                {activeTab === 'new' ? '新建文章' : '编辑文章'}
-              </h2>
+              <h2 className="mb-4 text-xl font-semibold">新建文章</h2>
               <ArticleEditor
+                key="new"
+                article={undefined}
+                onSave={handleSave}
+                onCancel={handleCancel}
+              />
+            </div>
+          )}
+
+          {activeTab === 'edit' && editingArticle && (
+            <div>
+              <h2 className="mb-4 text-xl font-semibold">编辑文章</h2>
+              <ArticleEditor
+                key={editingArticle._id}
                 article={editingArticle}
                 onSave={handleSave}
                 onCancel={handleCancel}
