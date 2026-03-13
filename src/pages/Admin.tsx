@@ -22,7 +22,7 @@ interface SiteSettings {
   footerText: string;
 }
 
-type AdminTab = 'articles' | 'new' | 'edit' | 'settings' | 'account' | 'api';
+type AdminTab = 'articles' | 'new' | 'edit' | 'settings' | 'account' | 'api' | 'categories';
 
 // ── 消息提示组件 ────────────────────────────────────────────
 function Toast({ message, type, onClose }: { message: string; type: 'success' | 'error'; onClose: () => void }) {
@@ -289,6 +289,152 @@ function AccountPanel() {
         >
           {saving ? '保存中...' : '保存账号设置'}
         </button>
+      </div>
+    </div>
+  );
+}
+
+// ── 分类管理面板 ────────────────────────────────────────────
+function CategoryPanel() {
+  interface Category { id: string; name: string; description: string; color: string; createdAt: string; }
+  const [cats, setCats] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [form, setForm] = useState({ name: '', description: '', color: '#3b82f6' });
+  const [editId, setEditId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const PRESET = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06b6d4','#6b7280'];
+
+  const load = async () => {
+    try {
+      const r = await fetch('/api/categories');
+      setCats(await r.json());
+    } finally { setLoading(false); }
+  };
+  useEffect(() => { load(); }, []);
+
+  const handleSave = async () => {
+    if (!form.name.trim()) { setToast({ message: '分类名称不能为空', type: 'error' }); return; }
+    setSaving(true);
+    try {
+      const token = localStorage.getItem('token');
+      const url = editId ? `/api/categories/${editId}` : '/api/categories';
+      const method = editId ? 'PUT' : 'POST';
+      const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(form) });
+      if (res.ok) {
+        setToast({ message: editId ? '分类已更新' : '分类已创建', type: 'success' });
+        setForm({ name: '', description: '', color: '#3b82f6' });
+        setEditId(null);
+        load();
+      } else { setToast({ message: '操作失败', type: 'error' }); }
+    } catch { setToast({ message: '网络错误', type: 'error' }); }
+    finally { setSaving(false); }
+  };
+
+  const handleEdit = (c: Category) => {
+    setEditId(c.id);
+    setForm({ name: c.name, description: c.description || '', color: c.color });
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('确认删除此分类？')) return;
+    const token = localStorage.getItem('token');
+    const res = await fetch(`/api/categories/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+    if (res.ok) { setToast({ message: '分类已删除', type: 'success' }); load(); }
+    else setToast({ message: '删除失败', type: 'error' });
+  };
+
+  if (loading) return <div className="py-12 text-center text-gray-500">加载中...</div>;
+
+  return (
+    <div className="max-w-3xl space-y-6">
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+
+      {/* 新建 / 编辑表单 */}
+      <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5">
+        <h3 className="mb-4 text-sm font-semibold">{editId ? '编辑分类' : '新建分类'}</h3>
+        <div className="space-y-3">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">分类名称 *</label>
+              <input
+                type="text"
+                value={form.name}
+                onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                placeholder="例如：前端开发"
+                className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">分类描述</label>
+              <input
+                type="text"
+                value={form.description}
+                onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                placeholder="简短描述"
+                className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="mb-2 block text-xs font-medium text-gray-600 dark:text-gray-400">分类颜色</label>
+            <div className="flex items-center gap-2 flex-wrap">
+              {PRESET.map(c => (
+                <button key={c} type="button" onClick={() => setForm(f => ({ ...f, color: c }))}
+                  className={`h-7 w-7 rounded-full border-2 transition-transform hover:scale-110 ${form.color === c ? 'border-gray-900 dark:border-white scale-110' : 'border-transparent'}`}
+                  style={{ backgroundColor: c }}
+                />
+              ))}
+              <input type="color" value={form.color} onChange={e => setForm(f => ({ ...f, color: e.target.value }))}
+                className="h-7 w-10 cursor-pointer rounded border border-gray-200 dark:border-gray-700" title="自定义颜色" />
+              <span className="text-xs font-mono text-gray-500">{form.color}</span>
+            </div>
+          </div>
+          <div className="flex gap-3 pt-1">
+            <button onClick={handleSave} disabled={saving}
+              className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
+              {saving ? '保存中...' : editId ? '更新分类' : '创建分类'}
+            </button>
+            {editId && (
+              <button onClick={() => { setEditId(null); setForm({ name: '', description: '', color: '#3b82f6' }); }}
+                className="rounded-lg border border-gray-200 dark:border-gray-700 px-5 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-800">
+                取消编辑
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* 分类列表 */}
+      <div>
+        <h3 className="mb-3 text-sm font-semibold text-gray-700 dark:text-gray-300">已有分类（{cats.length}）</h3>
+        {cats.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-gray-200 dark:border-gray-700 py-8 text-center text-sm text-gray-400">
+            暂无分类，请先创建
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {cats.map(c => (
+              <div key={c.id} className="flex items-center gap-4 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3">
+                <span className="h-4 w-4 shrink-0 rounded-full" style={{ backgroundColor: c.color }} />
+                <div className="flex-1 min-w-0">
+                  <span className="text-sm font-medium">{c.name}</span>
+                  {c.description && <span className="ml-2 text-xs text-gray-400 truncate">{c.description}</span>}
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  <button onClick={() => handleEdit(c)}
+                    className="rounded-md px-3 py-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30">
+                    编辑
+                  </button>
+                  <button onClick={() => handleDelete(c.id)}
+                    className="rounded-md px-3 py-1 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30">
+                    删除
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -594,6 +740,15 @@ export default function Admin() {
       )
     },
     {
+      key: 'categories',
+      label: '分类管理',
+      icon: (
+        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+        </svg>
+      )
+    },
+    {
       key: 'settings',
       label: '站点设置',
       icon: (
@@ -733,6 +888,7 @@ export default function Admin() {
 
           {activeTab === 'settings' && <SettingsPanel />}
           {activeTab === 'account' && <AccountPanel />}
+          {activeTab === 'categories' && <CategoryPanel />}
           {activeTab === 'api' && <ApiPanel />}
         </main>
       </div>

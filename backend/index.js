@@ -1,27 +1,131 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const multer = require('multer');
+const fs = require('fs');
 
 // 导入工具模块
 const { getArticles, saveArticles, generateId } = require('./src/utils/fileStorage');
 const { getSettings, saveSettings, getAccount, saveAccount } = require('./src/utils/settingsStorage');
+const { getCategories, saveCategories, generateCategoryId } = require('./src/utils/categoryStorage');
 const { authenticateToken } = require('./src/routes/auth');
 
 const app = express();
 
 // 中间件
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 const path = require('path');
 const publicPath = path.join(__dirname, 'public');
+
+// 图片上传目录
+const UPLOAD_DIR = path.join(__dirname, '../data/uploads');
+if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+
+// multer 配置：限制 5MB，只允许图片
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, UPLOAD_DIR),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, `${Date.now()}-${Math.random().toString(36).substr(2, 6)}${ext}`);
+  }
+});
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'];
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, allowed.includes(ext));
+  }
+});
 
 // ============================================================
 // 健康检查（最先注册）
 // ============================================================
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', message: 'Server is running' });
+});
+
+// 图片静态访问
+app.use('/uploads', express.static(UPLOAD_DIR));
+
+// ============================================================
+// 图片上传 API
+// ============================================================
+app.post('/api/upload', authenticateToken, upload.single('image'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: '请选择图片文件（jpg/png/gif/webp/svg，最大 5MB）' });
+  const url = `/uploads/${req.file.filename}`;
+  res.json({ success: true, url, filename: req.file.filename });
+});
+
+// 删除已上传图片
+app.delete('/api/upload/:filename', authenticateToken, (req, res) => {
+  const filePath = path.join(UPLOAD_DIR, req.params.filename);
+  try {
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    res.json({ success: true });
+  } catch {
+    res.status(500).json({ error: '删除失败' });
+  }
+});
+
+// ============================================================
+// 分类管理 API
+// ============================================================
+
+// 获取所有分类（公开）
+app.get('/api/categories', async (req, res) => {
+  try {
+    res.json(await getCategories());
+  } catch {
+    res.status(500).json({ error: '获取分类失败' });
+  }
+});
+
+// 新建分类（需认证）
+app.post('/api/categories', authenticateToken, async (req, res) => {
+  try {
+    const { name, description = '', color = '#6b7280' } = req.body;
+    if (!name) return res.status(400).json({ error: '分类名称不能为空' });
+    const cats = await getCategories();
+    const newCat = { id: generateCategoryId(), name, description, color, createdAt: new Date().toISOString() };
+    cats.push(newCat);
+    await saveCategories(cats);
+    res.status(201).json(newCat);
+  } catch {
+    res.status(500).json({ error: '创建分类失败' });
+  }
+});
+
+// 更新分类（需认证）
+app.put('/api/categories/:id', authenticateToken, async (req, res) => {
+  try {
+    const cats = await getCategories();
+    const idx = cats.findIndex(c => c.id === req.params.id);
+    if (idx === -1) return res.status(404).json({ error: '分类不存在' });
+    cats[idx] = { ...cats[idx], ...req.body, id: cats[idx].id };
+    await saveCategories(cats);
+    res.json(cats[idx]);
+  } catch {
+    res.status(500).json({ error: '更新分类失败' });
+  }
+});
+
+// 删除分类（需认证）
+app.delete('/api/categories/:id', authenticateToken, async (req, res) => {
+  try {
+    const cats = await getCategories();
+    const idx = cats.findIndex(c => c.id === req.params.id);
+    if (idx === -1) return res.status(404).json({ error: '分类不存在' });
+    cats.splice(idx, 1);
+    await saveCategories(cats);
+    res.json({ success: true });
+  } catch {
+    res.status(500).json({ error: '删除分类失败' });
+  }
 });
 
 // ============================================================
@@ -163,6 +267,8 @@ app.post('/api/articles', authenticateToken, async (req, res) => {
     const newArticle = {
       _id: generateId(),
       visible: true,
+      category: '',
+      coverImage: '',
       ...req.body,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()

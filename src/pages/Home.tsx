@@ -11,6 +11,14 @@ interface Article {
   tags: string[];
   readTime: string;
   visible?: boolean;
+  category?: string;
+  coverImage?: string;
+}
+
+interface Category {
+  id: string;
+  name: string;
+  color: string;
 }
 
 interface SiteSettings {
@@ -20,6 +28,8 @@ interface SiteSettings {
 
 export default function Home() {
   const [articles, setArticles] = useState<Article[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [activeCategory, setActiveCategory] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [settings, setSettings] = useState<SiteSettings>({
@@ -28,21 +38,16 @@ export default function Home() {
   });
 
   useEffect(() => {
-    // 并发获取文章和站点设置
     Promise.all([
-      fetch('/api/articles').then(r => {
-        if (!r.ok) throw new Error('获取文章失败');
-        return r.json();
-      }),
-      fetch('/api/settings').then(r => r.json()).catch(() => ({}))
+      fetch('/api/articles').then(r => { if (!r.ok) throw new Error('获取文章失败'); return r.json(); }),
+      fetch('/api/settings').then(r => r.json()).catch(() => ({})),
+      fetch('/api/categories').then(r => r.json()).catch(() => [])
     ])
-      .then(([articlesData, settingsData]) => {
+      .then(([articlesData, settingsData, categoriesData]) => {
         setArticles(articlesData);
+        setCategories(categoriesData);
         if (settingsData.siteTitle) {
-          setSettings({
-            siteTitle: settingsData.siteTitle,
-            siteSubtitle: settingsData.siteSubtitle || ''
-          });
+          setSettings({ siteTitle: settingsData.siteTitle, siteSubtitle: settingsData.siteSubtitle || '' });
         }
         setLoading(false);
       })
@@ -53,11 +58,15 @@ export default function Home() {
       });
   }, []);
 
+  const getCategoryInfo = (id: string) => categories.find(c => c.id === id);
+
+  const filtered = activeCategory ? articles.filter(a => a.category === activeCategory) : articles;
+
   if (loading) {
     return (
       <div className="container mx-auto px-4 py-8 sm:px-6 lg:px-8">
         <div className="text-center">
-          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]"></div>
+          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent"></div>
           <p className="mt-4 text-gray-600 dark:text-gray-400">正在加载文章...</p>
         </div>
       </div>
@@ -77,22 +86,60 @@ export default function Home() {
 
   return (
     <div className="container mx-auto px-4 py-8 sm:px-6 lg:px-8">
+      {/* 头部 */}
       <div className="mb-8">
         <h1 className="mb-2 text-4xl font-bold">欢迎来到{settings.siteTitle}</h1>
-        <p className="text-lg text-gray-600 dark:text-gray-400">
-          {settings.siteSubtitle}
-        </p>
+        <p className="text-lg text-gray-600 dark:text-gray-400">{settings.siteSubtitle}</p>
       </div>
 
-      {articles.length === 0 ? (
+      {/* 分类筛选 */}
+      {categories.length > 0 && (
+        <div className="mb-6 flex flex-wrap gap-2">
+          <button
+            onClick={() => setActiveCategory('')}
+            className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+              activeCategory === '' ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+            }`}
+          >
+            全部 ({articles.length})
+          </button>
+          {categories.map(cat => {
+            const count = articles.filter(a => a.category === cat.id).length;
+            if (count === 0) return null;
+            return (
+              <button
+                key={cat.id}
+                onClick={() => setActiveCategory(cat.id)}
+                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                  activeCategory === cat.id ? 'text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+                }`}
+                style={activeCategory === cat.id ? { backgroundColor: cat.color } : {}}
+              >
+                {cat.name} ({count})
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* 文章列表 */}
+      {filtered.length === 0 ? (
         <div className="rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 p-12 text-center">
           <p className="text-gray-500 dark:text-gray-400">暂无文章</p>
         </div>
       ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {articles.map((article) => (
-            <ArticleCard key={article._id} article={article} />
-          ))}
+          {filtered.map((article) => {
+            const cat = getCategoryInfo(article.category || '');
+            return (
+              <ArticleCard
+                key={article._id}
+                article={article}
+                categoryName={cat?.name}
+                categoryColor={cat?.color}
+              />
+            );
+          })}
         </div>
       )}
     </div>
