@@ -26,8 +26,9 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
           p: ({ children }) => (
             <p className="mb-4 leading-relaxed">{children}</p>
           ),
-          code: ({ inline, className, children, ...props }) => {
-            if (inline) {
+          code: ({ className, children, node, ...props }) => {
+            const isInline = !node?.position || (node.position.start.line === node.position.end.line);
+            if (isInline && !className) {
               return (
                 <code className="bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded text-sm font-mono" {...props}>
                   {children}
