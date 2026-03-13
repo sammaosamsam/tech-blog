@@ -14,31 +14,21 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// 静态文件服务（用于Docker部署时服务前端构建产物）
 const path = require('path');
 const publicPath = path.join(__dirname, 'public');
 
-// 健康检查路由（必须在静态文件通配符之前注册）
+// ============================================================
+// 健康检查路由（必须最先注册）
+// ============================================================
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', message: 'Server is running' });
 });
 
-if (require('fs').existsSync(publicPath)) {
-  app.use(express.static(publicPath));
-  console.log('Serving static files from:', publicPath);
+// ============================================================
+// API 路由（必须在静态文件通配符之前注册）
+// ============================================================
 
-  // 所有非API请求都返回index.html（支持React Router）
-  // Express 5.x 使用 /{*path} 替代裸 *
-  app.get('/{*path}', (req, res) => {
-    // 如果是API请求，不处理
-    if (req.path.startsWith('/api')) {
-      return res.status(404).json({ error: '路由不存在' });
-    }
-    res.sendFile(path.join(publicPath, 'index.html'));
-  });
-}
-
-// 认证路由（不需要认证）
+// 认证路由
 app.post('/api/auth/login', (req, res) => {
   try {
     const { username, password } = req.body;
@@ -87,7 +77,7 @@ app.post('/api/auth/login', (req, res) => {
   }
 });
 
-// API路由 - 文章CRUD（公开访问）
+// 文章列表（公开访问）
 app.get('/api/articles', async (req, res) => {
   try {
     const articles = await getArticles();
@@ -97,6 +87,7 @@ app.get('/api/articles', async (req, res) => {
   }
 });
 
+// 单篇文章（公开访问）
 app.get('/api/articles/:id', async (req, res) => {
   try {
     const articles = await getArticles();
@@ -112,7 +103,7 @@ app.get('/api/articles/:id', async (req, res) => {
   }
 });
 
-// 需要认证的文章操作路由
+// 创建文章（需要认证）
 app.post('/api/articles', authenticateToken, async (req, res) => {
   try {
     const articles = await getArticles();
@@ -132,6 +123,7 @@ app.post('/api/articles', authenticateToken, async (req, res) => {
   }
 });
 
+// 更新文章（需要认证）
 app.put('/api/articles/:id', authenticateToken, async (req, res) => {
   try {
     const articles = await getArticles();
@@ -154,6 +146,7 @@ app.put('/api/articles/:id', authenticateToken, async (req, res) => {
   }
 });
 
+// 删除文章（需要认证）
 app.delete('/api/articles/:id', authenticateToken, async (req, res) => {
   try {
     const articles = await getArticles();
@@ -172,7 +165,7 @@ app.delete('/api/articles/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// AI生成文章的接口（需要认证）
+// AI生成文章（需要认证）
 app.post('/api/generate', authenticateToken, (req, res) => {
   try {
     const { topic, style = '技术分享', length = 'medium' } = req.body;
@@ -201,7 +194,23 @@ app.post('/api/generate', authenticateToken, (req, res) => {
   }
 });
 
-// 辅助函数：生成文章内容
+// ============================================================
+// 静态文件服务 + React Router 兜底（必须在 API 路由之后）
+// ============================================================
+if (require('fs').existsSync(publicPath)) {
+  app.use(express.static(publicPath));
+  console.log('Serving static files from:', publicPath);
+
+  // 所有非API请求都返回index.html（支持React Router）
+  // Express 5.x 使用 /{*path} 替代裸 *
+  app.get('/{*path}', (req, res) => {
+    res.sendFile(path.join(publicPath, 'index.html'));
+  });
+}
+
+// ============================================================
+// 辅助函数
+// ============================================================
 function generateContent(topic, style, length) {
   const introductions = [
     `在当今快速发展的技术领域，${topic}已经成为开发者必须掌握的核心技能之一。`,
@@ -244,7 +253,6 @@ function generateContent(topic, style, length) {
   return markdownContent;
 }
 
-// 辅助函数：生成标签
 function generateTags(topic) {
   const commonTags = ['技术分享', '教程', '最佳实践'];
   const topicTags = [topic, '开发'];
@@ -256,7 +264,6 @@ function generateTags(topic) {
   return [...new Set([...commonTags, ...topicTags])];
 }
 
-// 辅助函数：计算阅读时间
 function calculateReadTime(topic, length) {
   const baseTime = 5;
   const lengthMultiplier = {
@@ -268,7 +275,9 @@ function calculateReadTime(topic, length) {
   return Math.round(baseTime * (lengthMultiplier[length] || 1));
 }
 
-// 错误处理中间件
+// ============================================================
+// 错误处理
+// ============================================================
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({
@@ -277,7 +286,6 @@ app.use((err, req, res, next) => {
   });
 });
 
-// 404处理
 app.use((req, res) => {
   res.status(404).json({ error: '路由不存在' });
 });
