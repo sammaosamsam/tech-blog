@@ -1,0 +1,2 @@
+# 用户上传文件目录
+# 此目录将被挂载到容器内 /app/backend/uploads

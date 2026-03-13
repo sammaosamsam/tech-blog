@@ -1,0 +1,5 @@
+# SSL 证书目录
+# 将您的证书文件放置于此：
+#   fullchain.pem  - 完整证书链
+#   privkey.pem    - 私钥
+# 如使用 Let's Encrypt，可通过 Certbot 自动签发。
