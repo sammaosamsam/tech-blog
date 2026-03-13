@@ -1,4 +1,5 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 import Navbar from './components/Navbar';
 import Home from './pages/Home';
 import ArticleDetail from './pages/ArticleDetail';
@@ -9,6 +10,17 @@ import Login from './pages/Login';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
+  const [footerText, setFooterText] = useState('© 2024 电脑技术博客. All rights reserved.');
+
+  useEffect(() => {
+    fetch('/api/settings')
+      .then(r => r.json())
+      .then(data => {
+        if (data.footerText) setFooterText(data.footerText);
+      })
+      .catch(() => {});
+  }, []);
+
   return (
     <Router>
       <div className="min-h-screen bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-50">
@@ -32,7 +44,7 @@ function App() {
         </main>
         <footer className="border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 py-6">
           <div className="container mx-auto px-4 text-center text-sm text-gray-600 dark:text-gray-400">
-            <p>© 2024 电脑技术博客. All rights reserved.</p>
+            <p>{footerText}</p>
           </div>
         </footer>
       </div>

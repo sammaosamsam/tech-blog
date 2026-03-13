@@ -18,6 +18,7 @@ const DEFAULT_SETTINGS = {
   siteTitle: '技术博客',
   siteSubtitle: '分享编程知识，探索技术前沿',
   siteUrl: 'http://localhost:5000',
+  footerText: '© 2024 电脑技术博客. All rights reserved.',
   updatedAt: new Date().toISOString()
 };
 

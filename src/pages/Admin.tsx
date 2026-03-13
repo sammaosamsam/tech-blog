@@ -19,6 +19,7 @@ interface SiteSettings {
   siteTitle: string;
   siteSubtitle: string;
   siteUrl: string;
+  footerText: string;
 }
 
 type AdminTab = 'articles' | 'new' | 'edit' | 'settings' | 'account' | 'api';
@@ -50,7 +51,7 @@ function Toast({ message, type, onClose }: { message: string; type: 'success' | 
 
 // ── 站点设置面板 ────────────────────────────────────────────
 function SettingsPanel() {
-  const [form, setForm] = useState<SiteSettings>({ siteTitle: '', siteSubtitle: '', siteUrl: '' });
+  const [form, setForm] = useState<SiteSettings>({ siteTitle: '', siteSubtitle: '', siteUrl: '', footerText: '' });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -126,6 +127,17 @@ function SettingsPanel() {
               className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
             />
             <p className="mt-1 text-xs text-gray-400">用于生成文章分享链接等场景</p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1.5">页脚版权文字</label>
+            <input
+              type="text"
+              value={form.footerText}
+              onChange={e => setForm(f => ({ ...f, footerText: e.target.value }))}
+              placeholder="例如：© 2024 电脑技术博客. All rights reserved."
+              className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+            />
+            <p className="mt-1 text-xs text-gray-400">显示在网站底部，可自定义版权年份和名称</p>
           </div>
         </div>
       </div>
