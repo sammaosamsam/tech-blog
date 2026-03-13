@@ -54,13 +54,12 @@ app.post('/api/auth/login', async (req, res) => {
 // 站点设置 API
 // ============================================================
 
-// 获取站点设置（公开，前端 Navbar 需要）
+// 获取站点设置（公开，前端 Navbar / Footer 需要）
 app.get('/api/settings', async (req, res) => {
   try {
     const settings = await getSettings();
-    // 公开接口不返回敏感字段
-    const { siteTitle, siteSubtitle, siteUrl } = settings;
-    res.json({ siteTitle, siteSubtitle, siteUrl });
+    const { siteTitle, siteSubtitle, siteUrl, footerText } = settings;
+    res.json({ siteTitle, siteSubtitle, siteUrl, footerText });
   } catch (error) {
     res.status(500).json({ error: '获取设置失败' });
   }
@@ -69,13 +68,14 @@ app.get('/api/settings', async (req, res) => {
 // 更新站点设置（需要认证）
 app.put('/api/settings', authenticateToken, async (req, res) => {
   try {
-    const { siteTitle, siteSubtitle, siteUrl } = req.body;
+    const { siteTitle, siteSubtitle, siteUrl, footerText } = req.body;
     const current = await getSettings();
     const updated = await saveSettings({
       ...current,
       ...(siteTitle !== undefined && { siteTitle }),
       ...(siteSubtitle !== undefined && { siteSubtitle }),
-      ...(siteUrl !== undefined && { siteUrl })
+      ...(siteUrl !== undefined && { siteUrl }),
+      ...(footerText !== undefined && { footerText })
     });
     res.json({ success: true, message: '设置已保存', data: updated });
   } catch (error) {
