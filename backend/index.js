@@ -28,7 +28,8 @@ if (require('fs').existsSync(publicPath)) {
   console.log('Serving static files from:', publicPath);
 
   // 所有非API请求都返回index.html（支持React Router）
-  app.get('*', (req, res) => {
+  // Express 5.x 使用 /{*path} 替代裸 *
+  app.get('/{*path}', (req, res) => {
     // 如果是API请求，不处理
     if (req.path.startsWith('/api')) {
       return res.status(404).json({ error: '路由不存在' });
