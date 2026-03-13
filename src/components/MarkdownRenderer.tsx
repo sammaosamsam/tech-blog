@@ -97,13 +97,3 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
   );
 }
 
-              }}
-            />
-          ),
-        }}
-      >
-        {content}
-      </ReactMarkdown>
-    </div>
-  );
-}
