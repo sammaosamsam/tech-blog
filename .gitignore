@@ -1,0 +1,48 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Backend
+backend/node_modules
+backend/data/*.json
+!backend/data/.gitkeep
+
+# Docker
+*.tar
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Test files
+test-*.js
+test-*.cjs
+*.test.js
+*.test.tsx
+
+# Temp files
+*.bak
+*-old.js
+COMPLETION_SUMMARY.md
+PROJECT_STRUCTURE.md
+CHECKLIST.md
+
+# Scripts dir has nested .git, exclude it
+scripts/
