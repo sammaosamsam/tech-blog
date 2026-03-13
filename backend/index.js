@@ -18,6 +18,11 @@ app.use(express.urlencoded({ extended: true }));
 const path = require('path');
 const publicPath = path.join(__dirname, 'public');
 
+// 健康检查路由（必须在静态文件通配符之前注册）
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', message: 'Server is running' });
+});
+
 if (require('fs').existsSync(publicPath)) {
   app.use(express.static(publicPath));
   console.log('Serving static files from:', publicPath);
@@ -25,7 +30,7 @@ if (require('fs').existsSync(publicPath)) {
   // 所有非API请求都返回index.html（支持React Router）
   app.get('*', (req, res) => {
     // 如果是API请求，不处理
-    if (req.path.startsWith('/api') || req.path === '/health') {
+    if (req.path.startsWith('/api')) {
       return res.status(404).json({ error: '路由不存在' });
     }
     res.sendFile(path.join(publicPath, 'index.html'));
@@ -261,11 +266,6 @@ function calculateReadTime(topic, length) {
 
   return Math.round(baseTime * (lengthMultiplier[length] || 1));
 }
-
-// 健康检查路由
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', message: 'Server is running' });
-});
 
 // 错误处理中间件
 app.use((err, req, res, next) => {
