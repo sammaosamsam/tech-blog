@@ -21,8 +21,8 @@ const components: Components = {
   p: ({ children }) => (
     <p className="mb-4 leading-relaxed">{children}</p>
   ),
-  // node を DOM に渡さないよう明示的に除外
-  code: ({ className, children, node: _node, ...rest }) => {
+  // 只解构 className 和 children，其余全部丢弃（含 node、inline 等 react-markdown 内部属性）
+  code: ({ className, children }) => {
     const isBlock = Boolean(className);
     if (isBlock) {
       const lang = (className || '').replace('language-', '');
@@ -43,13 +43,9 @@ const components: Components = {
         />
       );
     }
-    // 行内代码：同样过滤掉 node，只保留安全的 HTML 属性
-    const { ...safeProps } = rest as Record<string, unknown>;
+    // 行内代码：只传 children，不传任何其他属性到 DOM
     return (
-      <code
-        className="bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded text-sm font-mono"
-        {...(safeProps as React.HTMLAttributes<HTMLElement>)}
-      >
+      <code className="bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded text-sm font-mono">
         {children}
       </code>
     );

@@ -264,12 +264,14 @@ app.get('/api/articles/:id', async (req, res) => {
 app.post('/api/articles', authenticateToken, async (req, res) => {
   try {
     const articles = await getArticles();
+    // 注意：_id、createdAt、updatedAt 必须在 ...req.body 之后覆盖，
+    // 防止前端传来的空字符串 _id 覆盖服务器生成的唯一 ID
     const newArticle = {
-      _id: generateId(),
       visible: true,
       category: '',
       coverImage: '',
       ...req.body,
+      _id: generateId(),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
