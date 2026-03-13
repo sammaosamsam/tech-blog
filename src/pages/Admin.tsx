@@ -13,6 +13,8 @@ interface Article {
   tags: string[];
   readTime: string;
   visible?: boolean;
+  category?: string;
+  coverImage?: string;
 }
 
 interface SiteSettings {

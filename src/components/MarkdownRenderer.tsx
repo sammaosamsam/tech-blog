@@ -1,6 +1,7 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
+import rehypeRaw from 'rehype-raw';
 import 'highlight.js/styles/github-dark.css';
 
 interface MarkdownRendererProps {
@@ -12,7 +13,7 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
     <div className="prose prose-slate dark:prose-invert max-w-none">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
-        rehypePlugins={[rehypeHighlight]}
+        rehypePlugins={[rehypeRaw, rehypeHighlight]}
         components={{
           h1: ({ children }) => (
             <h1 className="text-4xl font-bold mt-8 mb-4">{children}</h1>
@@ -64,6 +65,18 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
             <blockquote className="border-l-4 border-blue-600 dark:border-blue-400 pl-4 italic my-4">
               {children}
             </blockquote>
+          ),
+          img: ({ src, alt }) => (
+            <img
+              src={src}
+              alt={alt || ''}
+              className="max-w-full rounded-lg my-4 shadow-sm border border-gray-200 dark:border-gray-700"
+              loading="lazy"
+              onError={(e) => {
+                const target = e.currentTarget;
+                target.style.display = 'none';
+              }}
+            />
           ),
         }}
       >

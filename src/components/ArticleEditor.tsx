@@ -41,8 +41,9 @@ export default function ArticleEditor({ article, onSave, onCancel }: ArticleEdit
   const [coverImage, setCoverImage] = useState(article?.coverImage || '');
   const [categories, setCategories] = useState<Category[]>([]);
 
-  // 上传状态
+  // 上传/提交状态
   const [uploading, setUploading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const coverInputRef = useRef<HTMLInputElement>(null);
 
@@ -248,21 +249,27 @@ export default function ArticleEditor({ article, onSave, onCancel }: ArticleEdit
   };
 
   // ── 提交 ──
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSave({
-      _id: article?._id || '',
-      title,
-      excerpt,
-      content,
-      author,
-      date: article?.date || new Date().toISOString().split('T')[0],
-      tags: tags.split(',').map(t => t.trim()).filter(Boolean),
-      readTime: readTime.toString(),
-      category,
-      coverImage,
-      visible: article?.visible !== false
-    });
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      await onSave({
+        _id: article?._id || '',
+        title,
+        excerpt,
+        content,
+        author,
+        date: article?.date || new Date().toISOString().split('T')[0],
+        tags: tags.split(',').map(t => t.trim()).filter(Boolean),
+        readTime: readTime.toString(),
+        category,
+        coverImage,
+        visible: article?.visible !== false
+      });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const PRESET_COLORS = ['#e53e3e', '#dd6b20', '#d69e2e', '#38a169', '#3182ce', '#805ad5', '#d53f8c', '#1a202c'];
@@ -352,7 +359,7 @@ export default function ArticleEditor({ article, onSave, onCancel }: ArticleEdit
         <div>
           <label className="mb-2 block text-sm font-semibold">封面图片</label>
           <div className="flex gap-3 items-start">
-            <input type="url" value={coverImage} onChange={e => setCoverImage(e.target.value)} className={inputCls} placeholder="输入图片链接，或点击右侧上传" />
+            <input type="text" value={coverImage} onChange={e => setCoverImage(e.target.value)} className={inputCls} placeholder="输入图片链接，或点击右侧上传" />
             <button
               type="button"
               onClick={() => coverInputRef.current?.click()}
@@ -464,10 +471,10 @@ export default function ArticleEditor({ article, onSave, onCancel }: ArticleEdit
 
         {/* 操作按钮 */}
         <div className="flex gap-4 pt-2">
-          <button type="submit" className="rounded-lg bg-blue-600 px-8 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600">
-            保存文章
+          <button type="submit" disabled={submitting} className="rounded-lg bg-blue-600 px-8 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed">
+            {submitting ? '保存中...' : '保存文章'}
           </button>
-          <button type="button" onClick={onCancel} className="rounded-lg border border-gray-200 dark:border-gray-700 px-8 py-2.5 text-sm font-medium transition-colors hover:bg-gray-50 dark:hover:bg-gray-800">
+          <button type="button" onClick={onCancel} disabled={submitting} className="rounded-lg border border-gray-200 dark:border-gray-700 px-8 py-2.5 text-sm font-medium transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50">
             取消
           </button>
         </div>
