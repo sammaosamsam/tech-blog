@@ -1,22 +1,23 @@
 # ============================================================
-# Tech Blog - Docker Compose 远程镜像部署配置
+# Tech Blog - Docker Compose 部署配置
 #
-# 镜像由 GitHub Actions 自动构建并推送到 ghcr.io
-# 所有配置已内嵌到镜像中，服务器无需准备任何配置文件
+# 直接使用 Node.js 应用对外提供服务（无 Nginx）
+# 镜像由 GitHub Actions 自动构建推送到 ghcr.io（公开）
 #
-# 启动：docker compose up -d
-# 更新：docker compose pull && docker compose up -d
+# 首次启动：docker compose up -d
+# 更新镜像：docker compose pull && docker compose up -d
 # ============================================================
 
 services:
 
-  # ----------------------------------------------------------
-  # 应用服务
-  # ----------------------------------------------------------
   tech-blog:
     image: ghcr.io/sammaosamsam/tech-blog/tech-blog:latest
     container_name: tech-blog-app
     restart: unless-stopped
+
+    ports:
+      - "80:5000"      # 对外 80 端口映射到容器 5000
+      - "5000:5000"    # 同时保留 5000 端口直接访问
 
     environment:
       - NODE_ENV=production
@@ -26,12 +27,6 @@ services:
     volumes:
       - blog-data:/app/backend/data
       - blog-uploads:/app/backend/uploads
-
-    expose:
-      - "5000"
-
-    networks:
-      - internal
 
     healthcheck:
       test:
@@ -52,47 +47,9 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # ----------------------------------------------------------
-  # Nginx 反向代理（配置已内嵌镜像，无需挂载配置文件）
-  # ----------------------------------------------------------
-  nginx:
-    image: ghcr.io/sammaosamsam/tech-blog/nginx:latest
-    container_name: tech-blog-nginx
-    restart: unless-stopped
-
-    ports:
-      - "80:80"
-      - "443:443"
-
-    networks:
-      - internal
-
-    depends_on:
-      tech-blog:
-        condition: service_healthy
-
-    healthcheck:
-      test: ["CMD", "nginx", "-t"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-
 # ============================================================
 # 持久化卷
 # ============================================================
 volumes:
   blog-data:
   blog-uploads:
-
-# ============================================================
-# 网络
-# ============================================================
-networks:
-  internal:
-    driver: bridge
