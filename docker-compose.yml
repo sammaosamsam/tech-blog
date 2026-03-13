@@ -2,7 +2,7 @@
 # Tech Blog - Docker Compose 远程镜像部署配置
 #
 # 镜像由 GitHub Actions 自动构建并推送到 ghcr.io
-# 部署前需登录：docker login ghcr.io -u <GitHub用户名> -p <PAT>
+# 所有配置已内嵌到镜像中，服务器无需准备任何配置文件
 #
 # 启动：docker compose up -d
 # 更新：docker compose pull && docker compose up -d
@@ -11,7 +11,7 @@
 services:
 
   # ----------------------------------------------------------
-  # 应用服务：从 GitHub Container Registry 拉取镜像
+  # 应用服务
   # ----------------------------------------------------------
   tech-blog:
     image: ghcr.io/sammaosamsam/tech-blog/tech-blog:latest
@@ -53,22 +53,16 @@ services:
         max-file: "3"
 
   # ----------------------------------------------------------
-  # Nginx 反向代理
+  # Nginx 反向代理（配置已内嵌镜像，无需挂载配置文件）
   # ----------------------------------------------------------
   nginx:
-    image: nginx:1.25-alpine
+    image: ghcr.io/sammaosamsam/tech-blog/nginx:latest
     container_name: tech-blog-nginx
     restart: unless-stopped
 
     ports:
       - "80:80"
       - "443:443"
-
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/conf.d:/etc/nginx/conf.d:ro
-      - ./nginx/certs:/etc/nginx/certs:ro
-      - nginx-logs:/var/log/nginx
 
     networks:
       - internal
@@ -95,7 +89,6 @@ services:
 volumes:
   blog-data:
   blog-uploads:
-  nginx-logs:
 
 # ============================================================
 # 网络
