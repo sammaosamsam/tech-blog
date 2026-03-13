@@ -788,43 +788,69 @@ export default function Admin() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 sm:px-6 lg:px-8">
+    <div className="container mx-auto px-4 py-4 sm:px-6 sm:py-8 lg:px-8">
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
-      {/* 顶部标题栏 */}
-      <div className="mb-6 flex items-center justify-between">
+      {/* 顶部标题栏 - 移动端垂直堆叠，桌面端水平排列 */}
+      <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold">后台管理</h1>
+          <h1 className="text-xl sm:text-2xl font-bold">后台管理</h1>
           <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
             欢迎回来，{user.name || '管理员'}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 shrink-0">
           <Link
             to="/"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 dark:border-gray-700 px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
             </svg>
-            前台首页
+            <span className="hidden sm:inline">前台首页</span>
+            <span className="sm:hidden">首页</span>
           </Link>
           <button
             onClick={handleLogout}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
             </svg>
-            退出登录
+            <span className="hidden sm:inline">退出登录</span>
+            <span className="sm:hidden">退出</span>
           </button>
         </div>
       </div>
 
-      {/* 侧边栏 + 内容区 */}
-      <div className="flex gap-6">
+      {/* 移动端：顶部标签栏 / 桌面端：侧边栏 + 内容区 */}
+      {/* 移动端顶部标签栏 */}
+      <div className="sm:hidden mb-4 overflow-x-auto -mx-4 px-4">
+        <nav className="flex gap-2 min-w-max">
+          {tabs.filter(t => t.key !== 'edit').map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => {
+                setActiveTab(tab.key);
+                if (tab.key !== 'edit') setEditingArticle(undefined);
+              }}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors ${
+                activeTab === tab.key || (activeTab === 'edit' && tab.key === 'articles')
+                  ? 'bg-blue-600 text-white dark:bg-blue-500'
+                  : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
+              }`}
+            >
+              {tab.icon}
+              <span className="hidden xs:inline">{tab.label}</span>
+            </button>
+          ))}
+        </nav>
+      </div>
+
+      {/* 桌面端侧边栏 + 内容区 */}
+      <div className="hidden sm:flex gap-6">
         {/* 侧边导航 */}
-        <aside className="w-48 shrink-0">
+        <aside className="w-48 lg:w-56 shrink-0">
           <nav className="space-y-1">
             {tabs.filter(t => t.key !== 'edit').map(tab => (
               <button
@@ -901,6 +927,61 @@ export default function Admin() {
           {activeTab === 'api' && <ApiPanel />}
         </main>
       </div>
+
+      {/* 移动端主内容区 */}
+      <main className="sm:hidden min-w-0">
+        {activeTab === 'articles' && (
+          <div>
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-semibold">文章管理</h2>
+              <button
+                onClick={() => { setActiveTab('new'); setEditingArticle(undefined); }}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                </svg>
+                新建
+              </button>
+            </div>
+            <ArticleListManager
+              articles={allArticles}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+              onToggleVisibility={handleToggleVisibility}
+            />
+          </div>
+        )}
+
+        {activeTab === 'new' && (
+          <div>
+            <h2 className="mb-4 text-lg font-semibold">新建文章</h2>
+            <ArticleEditor
+              key="new"
+              article={undefined}
+              onSave={handleSave}
+              onCancel={handleCancel}
+            />
+          </div>
+        )}
+
+        {activeTab === 'edit' && editingArticle && (
+          <div>
+            <h2 className="mb-4 text-lg font-semibold">编辑文章</h2>
+            <ArticleEditor
+              key={editingArticle._id}
+              article={editingArticle}
+              onSave={handleSave}
+              onCancel={handleCancel}
+            />
+          </div>
+        )}
+
+        {activeTab === 'settings' && <SettingsPanel />}
+        {activeTab === 'account' && <AccountPanel />}
+        {activeTab === 'categories' && <CategoryPanel />}
+        {activeTab === 'api' && <ApiPanel />}
+      </main>
     </div>
   );
 }
