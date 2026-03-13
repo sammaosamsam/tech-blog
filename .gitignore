@@ -47,5 +47,4 @@ CHECKLIST.md
 # Scripts dir has nested .git, exclude it
 scripts/
 
-# Temp: workflow requires PAT with workflow scope
-# .github/workflows/
+
