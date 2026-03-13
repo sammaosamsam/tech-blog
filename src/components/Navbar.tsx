@@ -1,8 +1,20 @@
 import { Link, useLocation } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 
 export default function Navbar() {
   const location = useLocation();
-  
+  const [siteTitle, setSiteTitle] = useState('技术博客');
+
+  useEffect(() => {
+    fetch('/api/settings')
+      .then(r => r.json())
+      .then(data => {
+        if (data.siteTitle) setSiteTitle(data.siteTitle);
+        if (data.siteTitle) document.title = data.siteTitle;
+      })
+      .catch(() => {});
+  }, []);
+
   const navItems = [
     { path: '/', label: '首页' },
     { path: '/tags', label: '标签' },
@@ -15,9 +27,9 @@ export default function Navbar() {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
           <Link to="/" className="flex items-center space-x-2">
-            <span className="text-xl font-bold">💻 技术博客</span>
+            <span className="text-xl font-bold">💻 {siteTitle}</span>
           </Link>
-          
+
           <div className="flex items-center space-x-1">
             {navItems.map((item) => (
               <Link

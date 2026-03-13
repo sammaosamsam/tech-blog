@@ -2,14 +2,14 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 
-// 导入文章数据管理（使用文件存储）
+// 导入工具模块
 const { getArticles, saveArticles, generateId } = require('./src/utils/fileStorage');
+const { getSettings, saveSettings, getAccount, saveAccount } = require('./src/utils/settingsStorage');
 const { authenticateToken } = require('./src/routes/auth');
 
-// 初始化Express应用
 const app = express();
 
-// 中间件配置
+// 中间件
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -18,85 +18,138 @@ const path = require('path');
 const publicPath = path.join(__dirname, 'public');
 
 // ============================================================
-// 健康检查路由（必须最先注册）
+// 健康检查（最先注册）
 // ============================================================
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', message: 'Server is running' });
 });
 
 // ============================================================
-// API 路由（必须在静态文件通配符之前注册）
+// 认证 API
 // ============================================================
-
-// 认证路由
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/auth/login', async (req, res) => {
   try {
     const { username, password } = req.body;
+    const account = await getAccount();
 
-    // 模拟用户数据库
-    const users = [
-      {
-        id: '1',
-        username: 'admin',
-        password: 'admin123',
-        name: '管理员'
-      }
-    ];
-
-    // 验证用户名和密码
-    const user = users.find(u => u.username === username && u.password === password);
-
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: '用户名或密码错误'
-      });
+    if (account.username !== username || account.password !== password) {
+      return res.status(401).json({ success: false, message: '用户名或密码错误' });
     }
 
-    // 生成简单的 token
-    const token = Buffer.from(`${user.id}:${Date.now()}`).toString('base64');
-
-    // 返回用户信息（不包含密码）
-    const { password: _, ...userWithoutPassword } = user;
+    const token = Buffer.from(`${account.id}:${Date.now()}`).toString('base64');
+    const { password: _, ...userWithoutPassword } = account;
 
     res.json({
       success: true,
       message: '登录成功',
-      data: {
-        user: userWithoutPassword,
-        token: token
-      }
+      data: { user: userWithoutPassword, token }
     });
-
   } catch (error) {
     console.error('登录失败:', error);
-    res.status(500).json({
-      success: false,
-      message: '服务器错误'
-    });
+    res.status(500).json({ success: false, message: '服务器错误' });
   }
 });
 
-// 文章列表（公开访问）
+// ============================================================
+// 站点设置 API
+// ============================================================
+
+// 获取站点设置（公开，前端 Navbar 需要）
+app.get('/api/settings', async (req, res) => {
+  try {
+    const settings = await getSettings();
+    // 公开接口不返回敏感字段
+    const { siteTitle, siteSubtitle, siteUrl } = settings;
+    res.json({ siteTitle, siteSubtitle, siteUrl });
+  } catch (error) {
+    res.status(500).json({ error: '获取设置失败' });
+  }
+});
+
+// 更新站点设置（需要认证）
+app.put('/api/settings', authenticateToken, async (req, res) => {
+  try {
+    const { siteTitle, siteSubtitle, siteUrl } = req.body;
+    const current = await getSettings();
+    const updated = await saveSettings({
+      ...current,
+      ...(siteTitle !== undefined && { siteTitle }),
+      ...(siteSubtitle !== undefined && { siteSubtitle }),
+      ...(siteUrl !== undefined && { siteUrl })
+    });
+    res.json({ success: true, message: '设置已保存', data: updated });
+  } catch (error) {
+    res.status(500).json({ error: '保存设置失败' });
+  }
+});
+
+// ============================================================
+// 账号管理 API
+// ============================================================
+
+// 修改账号密码（需要认证）
+app.put('/api/auth/account', authenticateToken, async (req, res) => {
+  try {
+    const { currentPassword, newUsername, newPassword, name } = req.body;
+    const account = await getAccount();
+
+    // 验证当前密码
+    if (account.password !== currentPassword) {
+      return res.status(401).json({ success: false, message: '当前密码错误' });
+    }
+
+    const updated = await saveAccount({
+      ...account,
+      ...(newUsername && { username: newUsername }),
+      ...(newPassword && { password: newPassword }),
+      ...(name && { name })
+    });
+
+    const { password: _, ...safe } = updated;
+    res.json({ success: true, message: '账号信息已更新', data: safe });
+  } catch (error) {
+    res.status(500).json({ error: '更新账号失败' });
+  }
+});
+
+// ============================================================
+// 文章 API
+// ============================================================
+
+// 获取文章列表
+// - 公开访问：只返回 visible !== false 的文章
+// - 管理员（带 token）：返回所有文章
 app.get('/api/articles', async (req, res) => {
   try {
     const articles = await getArticles();
-    res.json(articles);
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (token) {
+      // 尝试验证 token，成功则返回全部文章（含隐藏）
+      try {
+        const account = await getAccount();
+        const decoded = Buffer.from(token, 'base64').toString();
+        const [userId] = decoded.split(':');
+        if (userId === account.id) {
+          return res.json(articles);
+        }
+      } catch { /* token 无效，按公开处理 */ }
+    }
+
+    // 公开访问：只返回可见文章
+    res.json(articles.filter(a => a.visible !== false));
   } catch (error) {
     res.status(500).json({ error: '获取文章失败' });
   }
 });
 
-// 单篇文章（公开访问）
+// 获取单篇文章（公开，隐藏文章也可直接访问，如需严格可加判断）
 app.get('/api/articles/:id', async (req, res) => {
   try {
     const articles = await getArticles();
     const article = articles.find(a => a._id === req.params.id);
-
-    if (!article) {
-      return res.status(404).json({ error: '文章不存在' });
-    }
-
+    if (!article) return res.status(404).json({ error: '文章不存在' });
     res.json(article);
   } catch (error) {
     res.status(500).json({ error: '获取文章失败' });
@@ -109,14 +162,13 @@ app.post('/api/articles', authenticateToken, async (req, res) => {
     const articles = await getArticles();
     const newArticle = {
       _id: generateId(),
+      visible: true,
       ...req.body,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
-
     articles.push(newArticle);
     await saveArticles(articles);
-
     res.status(201).json(newArticle);
   } catch (error) {
     res.status(500).json({ error: '创建文章失败' });
@@ -128,21 +180,37 @@ app.put('/api/articles/:id', authenticateToken, async (req, res) => {
   try {
     const articles = await getArticles();
     const index = articles.findIndex(a => a._id === req.params.id);
-
-    if (index === -1) {
-      return res.status(404).json({ error: '文章不存在' });
-    }
+    if (index === -1) return res.status(404).json({ error: '文章不存在' });
 
     articles[index] = {
       ...articles[index],
       ...req.body,
       updatedAt: new Date().toISOString()
     };
-
     await saveArticles(articles);
     res.json(articles[index]);
   } catch (error) {
     res.status(500).json({ error: '更新文章失败' });
+  }
+});
+
+// 切换文章显示/隐藏（需要认证）
+app.patch('/api/articles/:id/visibility', authenticateToken, async (req, res) => {
+  try {
+    const articles = await getArticles();
+    const index = articles.findIndex(a => a._id === req.params.id);
+    if (index === -1) return res.status(404).json({ error: '文章不存在' });
+
+    const { visible } = req.body;
+    articles[index] = {
+      ...articles[index],
+      visible: Boolean(visible),
+      updatedAt: new Date().toISOString()
+    };
+    await saveArticles(articles);
+    res.json({ success: true, message: visible ? '文章已显示' : '文章已隐藏', data: articles[index] });
+  } catch (error) {
+    res.status(500).json({ error: '更新失败' });
   }
 });
 
@@ -151,43 +219,34 @@ app.delete('/api/articles/:id', authenticateToken, async (req, res) => {
   try {
     const articles = await getArticles();
     const index = articles.findIndex(a => a._id === req.params.id);
-
-    if (index === -1) {
-      return res.status(404).json({ error: '文章不存在' });
-    }
+    if (index === -1) return res.status(404).json({ error: '文章不存在' });
 
     articles.splice(index, 1);
     await saveArticles(articles);
-
     res.json({ message: '文章删除成功' });
   } catch (error) {
     res.status(500).json({ error: '删除文章失败' });
   }
 });
 
-// AI生成文章（需要认证）
+// ============================================================
+// AI 生成文章 API（需要认证）
+// ============================================================
 app.post('/api/generate', authenticateToken, (req, res) => {
   try {
     const { topic, style = '技术分享', length = 'medium' } = req.body;
-
-    if (!topic) {
-      return res.status(400).json({ error: '请提供文章主题' });
-    }
+    if (!topic) return res.status(400).json({ error: '请提供文章主题' });
 
     const generatedArticle = {
       title: `${topic} - 深度解析与实战指南`,
-      excerpt: `本文将深入探讨${topic}的核心概念、实际应用场景以及最佳实践。无论您是初学者还是有经验的开发者，都能从中获得有价值的见解。`,
+      excerpt: `本文将深入探讨${topic}的核心概念、实际应用场景以及最佳实践。`,
       content: generateContent(topic, style, length),
       author: 'AI Assistant',
       tags: generateTags(topic),
       readTime: calculateReadTime(topic, length)
     };
 
-    res.json({
-      success: true,
-      data: generatedArticle
-    });
-
+    res.json({ success: true, data: generatedArticle });
   } catch (error) {
     console.error('生成文章失败:', error);
     res.status(500).json({ error: '生成文章失败' });
@@ -195,84 +254,15 @@ app.post('/api/generate', authenticateToken, (req, res) => {
 });
 
 // ============================================================
-// 静态文件服务 + React Router 兜底（必须在 API 路由之后）
+// 静态文件 + React Router 兜底（必须在所有 API 之后）
 // ============================================================
 if (require('fs').existsSync(publicPath)) {
   app.use(express.static(publicPath));
   console.log('Serving static files from:', publicPath);
 
-  // 所有非API请求都返回index.html（支持React Router）
-  // Express 5.x 使用 /{*path} 替代裸 *
   app.get('/{*path}', (req, res) => {
     res.sendFile(path.join(publicPath, 'index.html'));
   });
-}
-
-// ============================================================
-// 辅助函数
-// ============================================================
-function generateContent(topic, style, length) {
-  const introductions = [
-    `在当今快速发展的技术领域，${topic}已经成为开发者必须掌握的核心技能之一。`,
-    `${topic}作为现代软件开发的重要组成部分，其重要性不言而喻。`,
-    `随着技术的不断进步，${topic}在各个行业中的应用越来越广泛。`
-  ];
-
-  const sections = [
-    {
-      title: '什么是' + topic + '？',
-      content: `${topic}是一种强大的技术解决方案，它能够帮助我们更高效地完成开发任务。通过合理运用${topic}，我们可以构建出更加稳定、可扩展的应用程序。`
-    },
-    {
-      title: topic + '的核心特性',
-      content: `1. **高性能**：${topic}在性能方面表现出色，能够处理大量并发请求。\n\n2. **易用性**：提供了简洁直观的API，降低了学习曲线。\n\n3. **可扩展性**：支持模块化设计，便于功能扩展。\n\n4. **社区支持**：拥有活跃的开发者社区，问题解决方案丰富。`
-    },
-    {
-      title: topic + '的应用场景',
-      content: `${topic}在以下场景中表现尤为突出：\n\n- Web应用开发\n- 移动应用后端\n- 微服务架构\n- 实时数据处理\n- API服务开发`
-    },
-    {
-      title: '最佳实践',
-      content: `在使用${topic}时，建议遵循以下最佳实践：\n\n1. **合理规划架构**：在项目开始前，充分评估需求和规模。\n\n2. **代码规范**：保持代码的一致性和可读性。\n\n3. **测试驱动**：编写充分的单元测试和集成测试。\n\n4. **持续集成**：建立完善的CI/CD流程。`
-    },
-    {
-      title: '总结',
-      content: `${topic}是一个值得深入学习和应用的技术。通过本文的介绍，相信您对${topic}有了更全面的了解。在实际项目中，不断实践和总结，才能真正掌握这门技术。`
-    }
-  ];
-
-  const intro = introductions[Math.floor(Math.random() * introductions.length)];
-  let markdownContent = `# ${topic} - 深度解析与实战指南\n\n${intro}\n\n`;
-
-  sections.forEach(section => {
-    markdownContent += `## ${section.title}\n\n${section.content}\n\n`;
-  });
-
-  markdownContent += `> 💡 **提示**：本文由AI自动生成，内容仅供参考。在实际应用中，请根据具体需求进行调整。\n\n---\n\n*欢迎在评论区分享您的看法和经验！*`;
-
-  return markdownContent;
-}
-
-function generateTags(topic) {
-  const commonTags = ['技术分享', '教程', '最佳实践'];
-  const topicTags = [topic, '开发'];
-
-  if (topic.includes('React')) topicTags.push('前端');
-  if (topic.includes('Python')) topicTags.push('后端');
-  if (topic.includes('数据库')) topicTags.push('数据');
-
-  return [...new Set([...commonTags, ...topicTags])];
-}
-
-function calculateReadTime(topic, length) {
-  const baseTime = 5;
-  const lengthMultiplier = {
-    short: 0.5,
-    medium: 1,
-    long: 1.5
-  };
-
-  return Math.round(baseTime * (lengthMultiplier[length] || 1));
 }
 
 // ============================================================
@@ -289,6 +279,63 @@ app.use((err, req, res, next) => {
 app.use((req, res) => {
   res.status(404).json({ error: '路由不存在' });
 });
+
+// ============================================================
+// 辅助函数
+// ============================================================
+function generateContent(topic, style, length) {
+  const introductions = [
+    `在当今快速发展的技术领域，${topic}已经成为开发者必须掌握的核心技能之一。`,
+    `${topic}作为现代软件开发的重要组成部分，其重要性不言而喻。`,
+    `随着技术的不断进步，${topic}在各个行业中的应用越来越广泛。`
+  ];
+
+  const sections = [
+    {
+      title: '什么是' + topic + '？',
+      content: `${topic}是一种强大的技术解决方案，它能够帮助我们更高效地完成开发任务。`
+    },
+    {
+      title: topic + '的核心特性',
+      content: `1. **高性能**：${topic}在性能方面表现出色。\n\n2. **易用性**：提供了简洁直观的API。\n\n3. **可扩展性**：支持模块化设计。\n\n4. **社区支持**：拥有活跃的开发者社区。`
+    },
+    {
+      title: topic + '的应用场景',
+      content: `${topic}在以下场景中表现尤为突出：\n\n- Web应用开发\n- 移动应用后端\n- 微服务架构\n- 实时数据处理`
+    },
+    {
+      title: '最佳实践',
+      content: `在使用${topic}时，建议遵循以下最佳实践：\n\n1. **合理规划架构**\n\n2. **代码规范**\n\n3. **测试驱动**\n\n4. **持续集成**`
+    },
+    {
+      title: '总结',
+      content: `${topic}是一个值得深入学习和应用的技术。通过本文的介绍，相信您对${topic}有了更全面的了解。`
+    }
+  ];
+
+  const intro = introductions[Math.floor(Math.random() * introductions.length)];
+  let markdownContent = `# ${topic} - 深度解析与实战指南\n\n${intro}\n\n`;
+  sections.forEach(section => {
+    markdownContent += `## ${section.title}\n\n${section.content}\n\n`;
+  });
+  markdownContent += `> 💡 **提示**：本文由AI自动生成，内容仅供参考。\n\n---\n\n*欢迎分享您的看法！*`;
+  return markdownContent;
+}
+
+function generateTags(topic) {
+  const commonTags = ['技术分享', '教程', '最佳实践'];
+  const topicTags = [topic, '开发'];
+  if (topic.includes('React')) topicTags.push('前端');
+  if (topic.includes('Python')) topicTags.push('后端');
+  if (topic.includes('数据库')) topicTags.push('数据');
+  return [...new Set([...commonTags, ...topicTags])];
+}
+
+function calculateReadTime(topic, length) {
+  const baseTime = 5;
+  const multiplier = { short: 0.5, medium: 1, long: 1.5 };
+  return Math.round(baseTime * (multiplier[length] || 1));
+}
 
 // 启动服务器
 const PORT = process.env.PORT || 5000;
