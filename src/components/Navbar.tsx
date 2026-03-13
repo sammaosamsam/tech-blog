@@ -1,9 +1,11 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useState, useEffect } from 'react';
+import { useTheme } from '../contexts/ThemeContext';
 
 export default function Navbar() {
   const location = useLocation();
   const [siteTitle, setSiteTitle] = useState('技术博客');
+  const { theme, toggleTheme } = useTheme();
 
   useEffect(() => {
     fetch('/api/settings')
@@ -44,6 +46,25 @@ export default function Navbar() {
                 {item.label}
               </Link>
             ))}
+
+            {/* 深色 / 浅色切换按钮 */}
+            <button
+              onClick={toggleTheme}
+              title={theme === 'dark' ? '切换到浅色模式' : '切换到深色模式'}
+              className="ml-2 inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
+            >
+              {theme === 'dark' ? (
+                /* 太阳图标 - 浅色模式 */
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707M17.657 17.657l-.707-.707M6.343 6.343l-.707-.707M12 8a4 4 0 100 8 4 4 0 000-8z" />
+                </svg>
+              ) : (
+                /* 月亮图标 - 深色模式 */
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 12.79A9 9 0 1111.21 3a7 7 0 109.79 9.79z" />
+                </svg>
+              )}
+            </button>
           </div>
         </div>
       </div>
